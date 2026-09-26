@@ -1,5 +1,4 @@
 using Google.Protobuf;
-using Grpc.Core;
 using Grpc.Net.Client;
 using LiteDB;
 using Xray.App.Proxyman.Command;
@@ -17,7 +16,6 @@ public sealed class XrayVlessCredentialManager : IAsyncDisposable
     private readonly LiteDatabase database;
     private readonly ILiteCollection<CredentialEntry> entries;
     private readonly CancellationTokenSource lifetime = new();
-    private static readonly TimeSpan RetryDelay = TimeSpan.FromSeconds(30);
 
     private sealed class CredentialEntry
     {
@@ -138,22 +136,22 @@ public sealed class XrayVlessCredentialManager : IAsyncDisposable
             {
                 await this.RemoveUserAsync(id.ToString(), cancellationToken);
             }
-            catch (RpcException)
+            catch
             {
+                bool exists = false;
                 try
                 {
-                    if (!await this.UserExistsInXrayAsync(id.ToString(), cancellationToken))
-                    {
-                        this.entries.Delete(id);
-                        return;
-                    }
+                    exists = await this.UserExistsInXrayAsync(id.ToString(), cancellationToken);
                 }
-                catch (RpcException)
+                catch
                 {
                 }
-
-                await Task.Delay(RetryDelay, cancellationToken);
-                continue;
+                
+                if (exists)
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(30), cancellationToken);
+                    continue;
+                }
             }
 
             this.entries.Delete(id);
