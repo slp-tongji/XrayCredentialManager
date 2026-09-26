@@ -5,21 +5,22 @@ option csharp_namespace = "Xray.App.Proxyman.Command";
 option go_package = "github.com/xtls/xray-core/app/proxyman/command";
 
 import "common/protocol/user.proto";
+import "common/serial/typed_message.proto";
 
-message AddUserRequest {
+message AddUserOperation {
   xray.common.protocol.User user = 1;
-  string inbound_tag = 2;
-  uint32 level = 3;
 }
 
-message AddUserResponse {}
-
-message RemoveUserRequest {
+message RemoveUserOperation {
   string email = 1;
-  string inbound_tag = 2;
 }
 
-message RemoveUserResponse {}
+message AlterInboundRequest {
+  string tag = 1;
+  xray.common.serial.TypedMessage operation = 2;
+}
+
+message AlterInboundResponse {}
 
 message GetInboundUserRequest {
   string tag = 1;
@@ -31,9 +32,7 @@ message GetInboundUserResponse {
 }
 
 service HandlerService {
-  rpc AddUser(AddUserRequest) returns (AddUserResponse) {}
-
-  rpc RemoveUser(RemoveUserRequest) returns (RemoveUserResponse) {}
+  rpc AlterInbound(AlterInboundRequest) returns (AlterInboundResponse) {}
 
   rpc GetInboundUsers(GetInboundUserRequest) returns (GetInboundUserResponse) {}
 }

@@ -74,25 +74,36 @@ public sealed class XrayVlessCredentialManager : IAsyncDisposable
     }
 
     private Task AddUserAsync(string email, string uuid, CancellationToken cancellationToken) =>
-        this.xray.AddUserAsync(new AddUserRequest
+        this.xray.AlterInboundAsync(new AlterInboundRequest
         {
-            User = new User
+            Tag = this.inboundTag,
+            Operation = new TypedMessage
             {
-                Email = email,
-                Account = new TypedMessage
+                Type = AddUserOperation.Descriptor.FullName,
+                Value = new AddUserOperation
                 {
-                    Type = Account.Descriptor.FullName,
-                    Value = new Account { Id = uuid }.ToByteString(),
-                },
+                    User = new User
+                    {
+                        Email = email,
+                        Account = new TypedMessage
+                        {
+                            Type = Account.Descriptor.FullName,
+                            Value = new Account { Id = uuid }.ToByteString(),
+                        },
+                    },
+                }.ToByteString(),
             },
-            InboundTag = this.inboundTag,
         }, cancellationToken: cancellationToken).ResponseAsync;
 
     private Task RemoveUserAsync(string email, CancellationToken cancellationToken) =>
-        this.xray.RemoveUserAsync(new RemoveUserRequest
+        this.xray.AlterInboundAsync(new AlterInboundRequest
         {
-            Email = email,
-            InboundTag = this.inboundTag,
+            Tag = this.inboundTag,
+            Operation = new TypedMessage
+            {
+                Type = RemoveUserOperation.Descriptor.FullName,
+                Value = new RemoveUserOperation { Email = email }.ToByteString(),
+            },
         }, cancellationToken: cancellationToken).ResponseAsync;
 
     private void ScheduleExpiry(Guid id, DateTimeOffset? expire)
@@ -123,19 +134,36 @@ public sealed class XrayVlessCredentialManager : IAsyncDisposable
             {
                 await this.RemoveUserAsync(id.ToString(), cancellationToken);
             }
-            catch (RpcException ex) when (ex.StatusCode == StatusCode.Unknown)
-            {
-                this.entries.Delete(id);
-                return;
-            }
             catch (RpcException)
             {
+                if (await this.UserExistsInXrayAsync(id.ToString(), cancellationToken) is false)
+                {
+                    this.entries.Delete(id);
+                    return;
+                }
+
                 await Task.Delay(RetryDelay, cancellationToken);
                 continue;
             }
 
             this.entries.Delete(id);
             return;
+        }
+    }
+
+    private async Task<bool?> UserExistsInXrayAsync(string email, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var response = await this.xray.GetInboundUsersAsync(
+                new GetInboundUserRequest { Tag = this.inboundTag },
+                cancellationToken: cancellationToken).ResponseAsync;
+
+            return response.Users.Any(x => x.Email == email);
+        }
+        catch (RpcException)
+        {
+            return null;
         }
     }
 
