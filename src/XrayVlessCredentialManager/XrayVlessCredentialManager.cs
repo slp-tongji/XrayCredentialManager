@@ -58,7 +58,7 @@ public sealed class XrayVlessCredentialManager : IAsyncDisposable
             cancellationToken: cancellationToken).ResponseAsync;
         var existing = response.Users
             .Select(x => x.Email)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            .ToHashSet();
 
         foreach (var entry in this.entries.FindAll())
         {

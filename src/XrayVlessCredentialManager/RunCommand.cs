@@ -7,16 +7,16 @@ namespace XrayVlessCredentialManager;
 [Command("run")]
 public sealed partial class RunCommand : ICommand
 {
-    [CommandOption("xray-api", Description = "xray gRPC API 地址，例如 http://127.0.0.1:10085")]
+    [CommandOption("xray-api")]
     public required string XrayApi { get; set; }
 
-    [CommandOption("inbound-tag", Description = "要管理用户的 VLESS 入站 tag")]
+    [CommandOption("inbound-tag")]
     public required string InboundTag { get; set; }
 
-    [CommandOption("credential-manager-port", Description = "凭证管理 HTTP API 端口")]
+    [CommandOption("credential-manager-port")]
     public required int CredentialManagerPort { get; set; }
 
-    [CommandOption("credential-database", Description = "凭证数据库文件路径")]
+    [CommandOption("credential-database")]
     public required FileInfo CredentialDatabase { get; set; }
 
     public async ValueTask ExecuteAsync(IConsole console)
