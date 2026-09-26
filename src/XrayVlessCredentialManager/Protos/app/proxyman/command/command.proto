@@ -21,8 +21,19 @@ message RemoveUserRequest {
 
 message RemoveUserResponse {}
 
+message GetInboundUserRequest {
+  string tag = 1;
+  string email = 2;
+}
+
+message GetInboundUserResponse {
+  repeated xray.common.protocol.User users = 1;
+}
+
 service HandlerService {
   rpc AddUser(AddUserRequest) returns (AddUserResponse) {}
 
   rpc RemoveUser(RemoveUserRequest) returns (RemoveUserResponse) {}
+
+  rpc GetInboundUsers(GetInboundUserRequest) returns (GetInboundUserResponse) {}
 }

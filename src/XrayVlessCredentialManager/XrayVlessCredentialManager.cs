@@ -53,6 +53,13 @@ public sealed class XrayVlessCredentialManager : IAsyncDisposable
 
     private async Task ResyncAsync(CancellationToken cancellationToken)
     {
+        var response = await this.xray.GetInboundUsersAsync(
+            new GetInboundUserRequest { Tag = this.inboundTag },
+            cancellationToken: cancellationToken).ResponseAsync;
+        var existing = response.Users
+            .Select(x => x.Email)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
         foreach (var entry in this.entries.FindAll())
         {
             if (entry.Expire is { } expire && expire <= DateTimeOffset.UtcNow)
@@ -61,7 +68,11 @@ public sealed class XrayVlessCredentialManager : IAsyncDisposable
                 continue;
             }
 
-            await this.AddUserAsync(entry.CredentialId.ToString(), entry.Credential, cancellationToken);
+            var email = entry.CredentialId.ToString();
+            if (existing.Contains(email))
+                continue;
+
+            await this.AddUserAsync(email, entry.Credential, cancellationToken);
         }
     }
 
