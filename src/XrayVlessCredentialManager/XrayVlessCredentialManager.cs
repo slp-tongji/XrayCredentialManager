@@ -20,7 +20,7 @@ public sealed class XrayVlessCredentialManager : IAsyncDisposable
     private sealed class CredentialEntry
     {
         [BsonId]
-        public Guid CredentialId { get; set; }
+        public string CredentialId { get; set; } = string.Empty;
 
         public required string Credential { get; set; }
 
@@ -63,7 +63,7 @@ public sealed class XrayVlessCredentialManager : IAsyncDisposable
 
         foreach (var entry in this.entries.FindAll())
         {
-            var email = entry.CredentialId.ToString();
+            var email = entry.CredentialId;
             if (!existing.Contains(email))
                 await this.AddUserAsync(email, entry.Credential, cancellationToken);
 
@@ -108,7 +108,7 @@ public sealed class XrayVlessCredentialManager : IAsyncDisposable
         }, cancellationToken: cancellationToken).ResponseAsync;
     }
 
-    private void ScheduleExpiry(Guid id, DateTimeOffset? expire)
+    private void ScheduleExpiry(string id, DateTimeOffset? expire)
     {
         if (expire is not { } e)
             return;
@@ -116,7 +116,7 @@ public sealed class XrayVlessCredentialManager : IAsyncDisposable
         _ = this.ExpireAfterAsync(id, e, this.lifetime.Token);
     }
 
-    private async Task ExpireAfterAsync(Guid id, DateTimeOffset expire, CancellationToken cancellationToken)
+    private async Task ExpireAfterAsync(string id, DateTimeOffset expire, CancellationToken cancellationToken)
     {
         while (true)
         {
@@ -134,14 +134,14 @@ public sealed class XrayVlessCredentialManager : IAsyncDisposable
 
             try
             {
-                await this.RemoveUserAsync(id.ToString(), cancellationToken);
+                await this.RemoveUserAsync(id, cancellationToken);
             }
             catch
             {
                 bool exists = true;
                 try
                 {
-                    exists = await this.UserExistsInXrayAsync(id.ToString(), cancellationToken);
+                    exists = await this.UserExistsInXrayAsync(id, cancellationToken);
                 }
                 catch
                 {
@@ -171,10 +171,10 @@ public sealed class XrayVlessCredentialManager : IAsyncDisposable
     public async Task<(string CredentialId, string Credential)> AddAsync(
         DateTimeOffset? expire, CancellationToken cancellationToken)
     {
-        var credentialId = Guid.NewGuid();
+        var credentialId = Guid.NewGuid().ToString();
         var uuid = Guid.NewGuid().ToString();
 
-        await this.AddUserAsync(credentialId.ToString(), uuid, cancellationToken);
+        await this.AddUserAsync(credentialId, uuid, cancellationToken);
 
         this.entries.Insert(new CredentialEntry
         {
@@ -185,15 +185,12 @@ public sealed class XrayVlessCredentialManager : IAsyncDisposable
 
         this.ScheduleExpiry(credentialId, expire);
 
-        return (credentialId.ToString(), uuid);
+        return (credentialId, uuid);
     }
 
     public (bool Exists, DateTimeOffset? Expire) Query(string credentialId)
     {
-        if (!Guid.TryParse(credentialId, out var id))
-            return (false, null);
-
-        var entry = this.entries.FindById(id);
+        var entry = this.entries.FindById(credentialId);
         if (entry is null)
             return (false, null);
 
@@ -202,14 +199,11 @@ public sealed class XrayVlessCredentialManager : IAsyncDisposable
 
     public async Task RemoveAsync(string credentialId, CancellationToken cancellationToken)
     {
-        if (!Guid.TryParse(credentialId, out var id))
+        if (this.entries.FindById(credentialId) is null)
             return;
 
-        if (this.entries.FindById(id) is null)
-            return;
-
-        await this.RemoveUserAsync(id.ToString(), cancellationToken);
-        this.entries.Delete(id);
+        await this.RemoveUserAsync(credentialId, cancellationToken);
+        this.entries.Delete(credentialId);
     }
 
     public async ValueTask DisposeAsync()
