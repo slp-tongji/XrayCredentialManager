@@ -18,6 +18,7 @@
           default = pkgs.mkShell {
             packages = [
               pkgs.dotnetCorePackages.sdk_10_0
+              pkgs.xray
             ];
             shellHook = ''
               export DOTNET_ROOT="${pkgs.dotnetCorePackages.sdk_10_0}/share/dotnet"
