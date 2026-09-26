@@ -73,8 +73,9 @@ public sealed class XrayVlessCredentialManager : IAsyncDisposable
         }
     }
 
-    private Task AddUserAsync(string email, string uuid, CancellationToken cancellationToken) =>
-        this.xray.AlterInboundAsync(new AlterInboundRequest
+    private async Task AddUserAsync(string email, string uuid, CancellationToken cancellationToken)
+    {
+        await this.xray.AlterInboundAsync(new AlterInboundRequest
         {
             Tag = this.inboundTag,
             Operation = new TypedMessage
@@ -94,9 +95,11 @@ public sealed class XrayVlessCredentialManager : IAsyncDisposable
                 }.ToByteString(),
             },
         }, cancellationToken: cancellationToken).ResponseAsync;
+    }
 
-    private Task RemoveUserAsync(string email, CancellationToken cancellationToken) =>
-        this.xray.AlterInboundAsync(new AlterInboundRequest
+    private async Task RemoveUserAsync(string email, CancellationToken cancellationToken)
+    {
+        await this.xray.AlterInboundAsync(new AlterInboundRequest
         {
             Tag = this.inboundTag,
             Operation = new TypedMessage
@@ -105,6 +108,7 @@ public sealed class XrayVlessCredentialManager : IAsyncDisposable
                 Value = new RemoveUserOperation { Email = email }.ToByteString(),
             },
         }, cancellationToken: cancellationToken).ResponseAsync;
+    }
 
     private void ScheduleExpiry(Guid id, DateTimeOffset? expire)
     {
@@ -136,10 +140,16 @@ public sealed class XrayVlessCredentialManager : IAsyncDisposable
             }
             catch (RpcException)
             {
-                if (await this.UserExistsInXrayAsync(id.ToString(), cancellationToken) is false)
+                try
                 {
-                    this.entries.Delete(id);
-                    return;
+                    if (!await this.UserExistsInXrayAsync(id.ToString(), cancellationToken))
+                    {
+                        this.entries.Delete(id);
+                        return;
+                    }
+                }
+                catch (RpcException)
+                {
                 }
 
                 await Task.Delay(RetryDelay, cancellationToken);
@@ -151,20 +161,13 @@ public sealed class XrayVlessCredentialManager : IAsyncDisposable
         }
     }
 
-    private async Task<bool?> UserExistsInXrayAsync(string email, CancellationToken cancellationToken)
+    private async Task<bool> UserExistsInXrayAsync(string email, CancellationToken cancellationToken)
     {
-        try
-        {
-            var response = await this.xray.GetInboundUsersAsync(
-                new GetInboundUserRequest { Tag = this.inboundTag },
-                cancellationToken: cancellationToken).ResponseAsync;
+        var response = await this.xray.GetInboundUsersAsync(
+            new GetInboundUserRequest { Tag = this.inboundTag },
+            cancellationToken: cancellationToken).ResponseAsync;
 
-            return response.Users.Any(x => x.Email == email);
-        }
-        catch (RpcException)
-        {
-            return null;
-        }
+        return response.Users.Any(x => x.Email == email);
     }
 
     public async Task<(string CredentialId, string Credential)> AddAsync(
