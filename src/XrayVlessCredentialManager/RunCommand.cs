@@ -21,8 +21,10 @@ public sealed partial class RunCommand : ICommand
 
     public async ValueTask ExecuteAsync(IConsole console)
     {
+        var cancellationToken = console.RegisterCancellationHandler();
+
         await using var credentials = await XrayVlessCredentialManager.OpenAsync(
-            XrayApi, InboundTag, CredentialDatabase.FullName);
+            XrayApi, InboundTag, CredentialDatabase.FullName, cancellationToken);
 
         await console.Output.WriteLineAsync($"xray API: {XrayApi} (inbound: {InboundTag})");
         await console.Output.WriteLineAsync($"Credential manager API listening on 127.0.0.1:{CredentialManagerPort}");

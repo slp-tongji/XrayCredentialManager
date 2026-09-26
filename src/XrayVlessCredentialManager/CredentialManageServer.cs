@@ -35,9 +35,9 @@ public sealed class CredentialManageServer : IAsyncDisposable
         await app.RunAsync();
     }
 
-    private async Task<CreateResponse> HandleCreate(CreateRequest request)
+    private async Task<CreateResponse> HandleCreate(CreateRequest request, CancellationToken cancellationToken)
     {
-        var (credentialId, credential) = await this.credentials.AddAsync(request.Expire);
+        var (credentialId, credential) = await this.credentials.AddAsync(request.Expire, cancellationToken);
         return new CreateResponse(credentialId, credential, request.Expire);
     }
 
@@ -54,9 +54,9 @@ public sealed class CredentialManageServer : IAsyncDisposable
         return new QueryResponse(items);
     }
 
-    private async Task<RevokeResponse> HandleRevoke(RevokeRequest request)
+    private async Task<RevokeResponse> HandleRevoke(RevokeRequest request, CancellationToken cancellationToken)
     {
-        await this.credentials.RemoveAsync(request.CredentialId);
+        await this.credentials.RemoveAsync(request.CredentialId, cancellationToken);
         return new RevokeResponse(true);
     }
 

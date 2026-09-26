@@ -16,6 +16,7 @@ public sealed class XrayVlessCredentialManager : IAsyncDisposable
     private readonly string inboundTag;
     private readonly LiteDatabase database;
     private readonly ILiteCollection<CredentialEntry> entries;
+    private readonly CancellationTokenSource lifetime = new();
 
     private sealed class CredentialEntry
     {
@@ -41,7 +42,7 @@ public sealed class XrayVlessCredentialManager : IAsyncDisposable
     }
 
     public static async Task<XrayVlessCredentialManager> OpenAsync(
-        string xrayApi, string inboundTag, string filePath, CancellationToken cancellationToken = default)
+        string xrayApi, string inboundTag, string filePath, CancellationToken cancellationToken)
     {
         var channel = GrpcChannel.ForAddress(xrayApi);
         var xray = new HandlerService.HandlerServiceClient(channel);
@@ -65,7 +66,7 @@ public sealed class XrayVlessCredentialManager : IAsyncDisposable
         {
             if (entry.Expire is { } expire && expire <= DateTimeOffset.UtcNow)
             {
-                await this.ExpireAsync(entry.CredentialId);
+                await this.ExpireAsync(entry.CredentialId, cancellationToken);
                 continue;
             }
 
@@ -104,10 +105,10 @@ public sealed class XrayVlessCredentialManager : IAsyncDisposable
         if (expire is not { } e)
             return;
 
-        _ = this.ExpireAfterAsync(id, e);
+        _ = this.ExpireAfterAsync(id, e, this.lifetime.Token);
     }
 
-    private async Task ExpireAfterAsync(Guid id, DateTimeOffset expire)
+    private async Task ExpireAfterAsync(Guid id, DateTimeOffset expire, CancellationToken cancellationToken)
     {
         while (true)
         {
@@ -115,20 +116,20 @@ public sealed class XrayVlessCredentialManager : IAsyncDisposable
             if (remaining <= TimeSpan.Zero)
                 break;
 
-            await Task.Delay(remaining);
+            await Task.Delay(remaining, cancellationToken);
         }
 
         if (this.entries.FindById(id) is null)
             return;
 
-        await this.ExpireAsync(id);
+        await this.ExpireAsync(id, cancellationToken);
     }
 
-    private async Task ExpireAsync(Guid id)
+    private async Task ExpireAsync(Guid id, CancellationToken cancellationToken)
     {
         try
         {
-            await this.RemoveUserAsync(id.ToString(), CancellationToken.None);
+            await this.RemoveUserAsync(id.ToString(), cancellationToken);
         }
         catch (RpcException)
         {
@@ -138,7 +139,7 @@ public sealed class XrayVlessCredentialManager : IAsyncDisposable
     }
 
     public async Task<(string CredentialId, string Credential)> AddAsync(
-        DateTimeOffset? expire, CancellationToken cancellationToken = default)
+        DateTimeOffset? expire, CancellationToken cancellationToken)
     {
         var credentialId = Guid.NewGuid();
         var uuid = Guid.NewGuid().ToString();
@@ -168,14 +169,14 @@ public sealed class XrayVlessCredentialManager : IAsyncDisposable
 
         if (entry.Expire is { } expire && expire <= DateTimeOffset.UtcNow)
         {
-            _ = this.ExpireAsync(id);
+            _ = this.ExpireAsync(id, this.lifetime.Token);
             return (false, null);
         }
 
         return (true, entry.Expire);
     }
 
-    public async Task RemoveAsync(string credentialId, CancellationToken cancellationToken = default)
+    public async Task RemoveAsync(string credentialId, CancellationToken cancellationToken)
     {
         if (!Guid.TryParse(credentialId, out var id))
             return;
@@ -189,7 +190,9 @@ public sealed class XrayVlessCredentialManager : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        this.lifetime.Cancel();
         this.database.Dispose();
         this.channel.Dispose();
+        this.lifetime.Dispose();
     }
 }
