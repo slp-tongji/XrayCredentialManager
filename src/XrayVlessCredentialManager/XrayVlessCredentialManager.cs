@@ -1,4 +1,5 @@
 using Google.Protobuf;
+using Grpc.Core;
 using Grpc.Net.Client;
 using LiteDB;
 using Xray.App.Proxyman.Command;
@@ -64,15 +65,15 @@ public sealed class XrayVlessCredentialManager : IAsyncDisposable
         {
             if (entry.Expire is { } expire && expire <= DateTimeOffset.UtcNow)
             {
-                this.entries.Delete(entry.CredentialId);
+                await this.ExpireAsync(entry.CredentialId);
                 continue;
             }
 
             var email = entry.CredentialId.ToString();
-            if (existing.Contains(email))
-                continue;
+            if (!existing.Contains(email))
+                await this.AddUserAsync(email, entry.Credential, cancellationToken);
 
-            await this.AddUserAsync(email, entry.Credential, cancellationToken);
+            this.ScheduleExpiry(entry.CredentialId, entry.Expire);
         }
     }
 
@@ -98,6 +99,47 @@ public sealed class XrayVlessCredentialManager : IAsyncDisposable
             InboundTag = this.inboundTag,
         }, cancellationToken: cancellationToken).ResponseAsync;
 
+    private void ScheduleExpiry(Guid id, DateTimeOffset? expire)
+    {
+        if (expire is not { } e)
+            return;
+
+        var delay = e - DateTimeOffset.UtcNow;
+        if (delay <= TimeSpan.Zero)
+        {
+            _ = this.ExpireAsync(id);
+            return;
+        }
+
+        _ = this.ExpireAfterAsync(id, delay);
+    }
+
+    private async Task ExpireAfterAsync(Guid id, TimeSpan delay)
+    {
+        await Task.Delay(delay);
+        await this.ExpireAsync(id);
+    }
+
+    private async Task ExpireAsync(Guid id)
+    {
+        var entry = this.entries.FindById(id);
+        if (entry is null)
+            return;
+
+        if (entry.Expire is { } expire && expire > DateTimeOffset.UtcNow)
+            return;
+
+        try
+        {
+            await this.RemoveUserAsync(id.ToString(), CancellationToken.None);
+        }
+        catch (RpcException)
+        {
+        }
+
+        this.entries.Delete(id);
+    }
+
     public async Task<(string CredentialId, string Credential)> AddAsync(
         DateTimeOffset? expire, CancellationToken cancellationToken = default)
     {
@@ -113,6 +155,8 @@ public sealed class XrayVlessCredentialManager : IAsyncDisposable
             Expire = expire,
         });
 
+        this.ScheduleExpiry(credentialId, expire);
+
         return (credentialId.ToString(), uuid);
     }
 
@@ -127,7 +171,7 @@ public sealed class XrayVlessCredentialManager : IAsyncDisposable
 
         if (entry.Expire is { } expire && expire <= DateTimeOffset.UtcNow)
         {
-            this.entries.Delete(id);
+            _ = this.ExpireAsync(id);
             return (false, null);
         }
 
