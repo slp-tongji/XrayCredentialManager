@@ -138,7 +138,7 @@ public sealed class XrayVlessCredentialManager : IAsyncDisposable
             }
             catch
             {
-                bool exists = false;
+                bool exists = true;
                 try
                 {
                     exists = await this.UserExistsInXrayAsync(id.ToString(), cancellationToken);
@@ -146,7 +146,7 @@ public sealed class XrayVlessCredentialManager : IAsyncDisposable
                 catch
                 {
                 }
-                
+
                 if (exists)
                 {
                     await Task.Delay(TimeSpan.FromSeconds(30), cancellationToken);
