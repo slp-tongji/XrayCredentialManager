@@ -17,6 +17,7 @@ public sealed class XrayVlessCredentialManager : IAsyncDisposable
     private readonly LiteDatabase database;
     private readonly ILiteCollection<CredentialEntry> entries;
     private readonly CancellationTokenSource lifetime = new();
+    private static readonly TimeSpan RetryDelay = TimeSpan.FromSeconds(30);
 
     private sealed class CredentialEntry
     {
@@ -64,12 +65,6 @@ public sealed class XrayVlessCredentialManager : IAsyncDisposable
 
         foreach (var entry in this.entries.FindAll())
         {
-            if (entry.Expire is { } expire && expire <= DateTimeOffset.UtcNow)
-            {
-                await this.ExpireAsync(entry.CredentialId, cancellationToken);
-                continue;
-            }
-
             var email = entry.CredentialId.ToString();
             if (!existing.Contains(email))
                 await this.AddUserAsync(email, entry.Credential, cancellationToken);
@@ -119,23 +114,29 @@ public sealed class XrayVlessCredentialManager : IAsyncDisposable
             await Task.Delay(remaining, cancellationToken);
         }
 
-        if (this.entries.FindById(id) is null)
+        while (true)
+        {
+            if (this.entries.FindById(id) is null)
+                return;
+
+            try
+            {
+                await this.RemoveUserAsync(id.ToString(), cancellationToken);
+            }
+            catch (RpcException ex) when (ex.StatusCode == StatusCode.Unknown)
+            {
+                this.entries.Delete(id);
+                return;
+            }
+            catch (RpcException)
+            {
+                await Task.Delay(RetryDelay, cancellationToken);
+                continue;
+            }
+
+            this.entries.Delete(id);
             return;
-
-        await this.ExpireAsync(id, cancellationToken);
-    }
-
-    private async Task ExpireAsync(Guid id, CancellationToken cancellationToken)
-    {
-        try
-        {
-            await this.RemoveUserAsync(id.ToString(), cancellationToken);
         }
-        catch (RpcException)
-        {
-        }
-
-        this.entries.Delete(id);
     }
 
     public async Task<(string CredentialId, string Credential)> AddAsync(
@@ -166,12 +167,6 @@ public sealed class XrayVlessCredentialManager : IAsyncDisposable
         var entry = this.entries.FindById(id);
         if (entry is null)
             return (false, null);
-
-        if (entry.Expire is { } expire && expire <= DateTimeOffset.UtcNow)
-        {
-            _ = this.ExpireAsync(id, this.lifetime.Token);
-            return (false, null);
-        }
 
         return (true, entry.Expire);
     }
