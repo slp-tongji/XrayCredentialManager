@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package xray.app.proxyman.command;
+option csharp_namespace = "Xray.App.Proxyman.Command";
+option go_package = "github.com/xtls/xray-core/app/proxyman/command";
+
+import "common/protocol/user.proto";
+
+message AddUserRequest {
+  xray.common.protocol.User user = 1;
+  string inbound_tag = 2;
+  uint32 level = 3;
+}
+
+message AddUserResponse {}
+
+message RemoveUserRequest {
+  string email = 1;
+  string inbound_tag = 2;
+}
+
+message RemoveUserResponse {}
+
+service HandlerService {
+  rpc AddUser(AddUserRequest) returns (AddUserResponse) {}
+
+  rpc RemoveUser(RemoveUserRequest) returns (RemoveUserResponse) {}
+}
