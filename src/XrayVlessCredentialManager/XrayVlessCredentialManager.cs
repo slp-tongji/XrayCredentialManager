@@ -104,31 +104,28 @@ public sealed class XrayVlessCredentialManager : IAsyncDisposable
         if (expire is not { } e)
             return;
 
-        var delay = e - DateTimeOffset.UtcNow;
-        if (delay <= TimeSpan.Zero)
-        {
-            _ = this.ExpireAsync(id);
-            return;
-        }
-
-        _ = this.ExpireAfterAsync(id, delay);
+        _ = this.ExpireAfterAsync(id, e);
     }
 
-    private async Task ExpireAfterAsync(Guid id, TimeSpan delay)
+    private async Task ExpireAfterAsync(Guid id, DateTimeOffset expire)
     {
-        await Task.Delay(delay);
+        while (true)
+        {
+            var remaining = expire - DateTimeOffset.UtcNow;
+            if (remaining <= TimeSpan.Zero)
+                break;
+
+            await Task.Delay(remaining);
+        }
+
+        if (this.entries.FindById(id) is null)
+            return;
+
         await this.ExpireAsync(id);
     }
 
     private async Task ExpireAsync(Guid id)
     {
-        var entry = this.entries.FindById(id);
-        if (entry is null)
-            return;
-
-        if (entry.Expire is { } expire && expire > DateTimeOffset.UtcNow)
-            return;
-
         try
         {
             await this.RemoveUserAsync(id.ToString(), CancellationToken.None);
