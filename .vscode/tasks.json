@@ -7,7 +7,7 @@
             "type": "process",
             "args": [
                 "build",
-                "${workspaceFolder}/src/Sample/Sample.csproj"
+                "${workspaceFolder}/src/XrayVlessCredentialManager/XrayVlessCredentialManager.csproj"
             ],
             "problemMatcher": "$msCompile",
             "group": {

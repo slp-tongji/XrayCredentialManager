@@ -2,7 +2,7 @@ using CliFx;
 using CliFx.Binding;
 using CliFx.Infrastructure;
 
-namespace XrayCredentialManager;
+namespace XrayVlessCredentialManager;
 
 [Command("run")]
 public sealed partial class RunCommand : ICommand
@@ -21,7 +21,7 @@ public sealed partial class RunCommand : ICommand
 
     public async ValueTask ExecuteAsync(IConsole console)
     {
-        await using var credentials = await XrayCredentialManager.OpenAsync(
+        await using var credentials = await XrayVlessCredentialManager.OpenAsync(
             XrayApi, InboundTag, CredentialDatabase.FullName);
 
         await console.Output.WriteLineAsync($"xray API: {XrayApi} (inbound: {InboundTag})");

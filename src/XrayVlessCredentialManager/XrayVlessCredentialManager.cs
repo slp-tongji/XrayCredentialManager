@@ -6,9 +6,9 @@ using Xray.Common.Protocol;
 using Xray.Common.Serial;
 using Xray.Proxy.Vless;
 
-namespace XrayCredentialManager;
+namespace XrayVlessCredentialManager;
 
-public sealed class XrayCredentialManager : IAsyncDisposable
+public sealed class XrayVlessCredentialManager : IAsyncDisposable
 {
     private readonly GrpcChannel channel;
     private readonly HandlerService.HandlerServiceClient xray;
@@ -26,7 +26,7 @@ public sealed class XrayCredentialManager : IAsyncDisposable
         public DateTimeOffset? Expire { get; set; }
     }
 
-    private XrayCredentialManager(
+    private XrayVlessCredentialManager(
         GrpcChannel channel,
         HandlerService.HandlerServiceClient xray,
         string inboundTag,
@@ -39,14 +39,14 @@ public sealed class XrayCredentialManager : IAsyncDisposable
         this.entries = database.GetCollection<CredentialEntry>("credentials");
     }
 
-    public static async Task<XrayCredentialManager> OpenAsync(
+    public static async Task<XrayVlessCredentialManager> OpenAsync(
         string xrayApi, string inboundTag, string filePath, CancellationToken cancellationToken = default)
     {
         var channel = GrpcChannel.ForAddress(xrayApi);
         var xray = new HandlerService.HandlerServiceClient(channel);
         var database = new LiteDatabase(filePath);
 
-        var manager = new XrayCredentialManager(channel, xray, inboundTag, database);
+        var manager = new XrayVlessCredentialManager(channel, xray, inboundTag, database);
         await manager.ResyncAsync(cancellationToken);
         return manager;
     }

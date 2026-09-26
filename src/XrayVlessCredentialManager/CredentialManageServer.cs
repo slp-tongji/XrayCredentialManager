@@ -3,21 +3,21 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Tjslp.CredentialManager.Protocol;
 
-namespace XrayCredentialManager;
+namespace XrayVlessCredentialManager;
 
 public sealed class CredentialManageServer : IAsyncDisposable
 {
-    private readonly XrayCredentialManager credentials;
+    private readonly XrayVlessCredentialManager credentials;
     private readonly WebApplication app;
 
-    private CredentialManageServer(XrayCredentialManager credentials, WebApplication app)
+    private CredentialManageServer(XrayVlessCredentialManager credentials, WebApplication app)
     {
         this.credentials = credentials;
         this.app = app;
     }
 
     public static async Task RunAsync(
-        XrayCredentialManager credentials, int port)
+        XrayVlessCredentialManager credentials, int port)
     {
         var builder = WebApplication.CreateEmptyBuilder(new WebApplicationOptions());
 

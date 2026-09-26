@@ -2,11 +2,11 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "C#: Sample",
+            "name": "C#: XrayVlessCredentialManager",
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            "program": "${workspaceFolder}/src/Sample/bin/Debug/net10.0/Sample.dll",
+            "program": "${workspaceFolder}/src/XrayVlessCredentialManager/bin/Debug/net10.0/XrayVlessCredentialManager.dll",
             "args": [],
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal"
